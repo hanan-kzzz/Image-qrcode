@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#10131b">
+<title>ScanLink — Image to Scannable</title>
+<style>
+:root{color-scheme:dark;--bg:#0d1017;--panel:#171c27;--line:#2b3445;--muted:#9ba8bb;--text:#f4f7fb;--accent:#8b9cff;--accent2:#b5c0ff}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at 80% 0%,#202844 0,transparent 35%),var(--bg);color:var(--text);font:15px/1.5 Inter,system-ui,Arial,sans-serif}
+header{padding:22px max(20px,calc((100% - 1120px)/2));border-bottom:1px solid #252d3b;display:flex;align-items:center;justify-content:space-between}
+.brand{font-weight:800;font-size:20px;letter-spacing:-.5px}.brand span{color:var(--accent)}
+main{max-width:1120px;margin:38px auto;padding:0 20px}.intro{margin-bottom:26px}.intro h1{font-size:clamp(28px,5vw,42px);line-height:1.1;margin:0 0 10px;letter-spacing:-1.5px}.intro p{color:var(--muted);margin:0;max-width:650px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:20px}
+.panel{background:rgba(23,28,39,.94);border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 18px 55px #0002}
+h2{font-size:17px;margin:0 0 18px}.field{margin:0 0 17px}label{display:block;font-weight:650;margin-bottom:7px}input[type=url],input[type=number]{width:100%;background:#0f1420;border:1px solid #344056;border-radius:10px;padding:12px;color:var(--text);font:inherit;outline:none}input:focus{border-color:var(--accent)}
+input[type=file]{width:100%;padding:12px;border:1px dashed #52617a;border-radius:10px;background:#101622;color:var(--muted)}
+.hint{color:var(--muted);font-size:12px;margin-top:6px}.row{display:flex;gap:12px}.row>*{flex:1;min-width:0}
+button{border:0;border-radius:10px;padding:12px 16px;font:inherit;font-weight:700;cursor:pointer}.primary{background:var(--accent);color:#101426;width:100%}.primary:hover{background:var(--accent2)}.secondary{background:#283247;color:var(--text)}button:disabled{opacity:.45;cursor:not-allowed}
+.preview{min-height:300px;background:#0e131d;border:1px dashed #3b465a;border-radius:13px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+.preview img{display:block;max-width:100%;max-height:430px;object-fit:contain}.empty{text-align:center;color:var(--muted);padding:40px 20px}.empty strong{display:block;color:#dbe2f0;margin-bottom:6px}
+.qrbox{margin-top:17px;display:flex;gap:14px;align-items:center;background:#101622;border:1px solid var(--line);border-radius:12px;padding:12px}.qrbox img{width:84px;height:84px;background:white;padding:4px;border-radius:5px}
+.status{margin-top:12px;color:var(--muted);font-size:13px;min-height:20px}.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.note{font-size:12px;color:var(--muted);margin-top:18px;border-top:1px solid var(--line);padding-top:14px}
+@media(max-width:780px){main{margin:25px auto}.layout{grid-template-columns:1fr}.panel{padding:17px}.preview{min-height:220px}}
+</style>
+</head>
+<body>
+<header><div class="brand">Scan<span>Link</span></div><div style="color:#9ba8bb;font-size:13px">V1 · Image QR Generator</div></header>
+<main>
+<section class="intro"><h1>Make any image<br>ready to scan.</h1><p>Upload a photo, add the website link, and place a scannable QR code on the image. Download the finished image and share it anywhere.</p></section>
+<div class="layout">
+<section class="panel">
+<h2>01 / Create your scannable image</h2>
+<div class="field"><label for="photo">Upload image</label><input id="photo" type="file" accept="image/png,image/jpeg,image/webp"><div class="hint">PNG, JPG or WebP · Use a clear, high-resolution image.</div></div>
+<div class="field"><label for="url">Website URL</label><input id="url" type="url" placeholder="https://example.com"><div class="hint">Include https:// so phones can open the website correctly.</div></div>
+<div class="row">
+<div class="field"><label for="size">QR size</label><input id="size" type="number" min="100" max="500" value="180"></div>
+<div class="field"><label for="margin">Edge margin</label><input id="margin" type="number" min="0" max="100" value="24"></div>
+</div>
+<button class="primary" id="generate">Generate scannable image</button>
+<div class="status" id="status" role="status">Upload an image and enter a website URL to begin.</div>
+<div class="note">Scanning tip: keep the QR code square, high-contrast, unobstructed, and large enough to scan. Test the downloaded image with another phone before printing.</div>
+</section>
+<section class="panel">
+<h2>02 / Preview & export</h2>
+<div class="preview" id="preview"><div class="empty"><strong>Your image preview appears here</strong>Upload an image to get started.</div></div>
+<div class="qrbox" id="qrbox" hidden><div id="qrsmall"></div><div><strong>QR code generated</strong><div class="hint">This code opens the website URL you entered.</div></div></div>
+<div class="actions"><button class="secondary" id="download" disabled>Download PNG</button><button class="secondary" id="reset">Reset</button></div>
+</section>
+</div>
+</main>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const photo=document.getElementById('photo'), urlInput=document.getElementById('url'), preview=document.getElementById('preview');
+const statusEl=document.getElementById('status'), generate=document.getElementById('generate'), download=document.getElementById('download');
+let sourceImage=null, outputUrl=null;
+photo.addEventListener('change',()=>{
+ const f=photo.files?.[0]; if(!f)return;
+ if(!['image/png','image/jpeg','image/webp'].includes(f.type)){statusEl.textContent='Please choose a PNG, JPG or WebP image.';return;}
+ const reader=new FileReader(); reader.onload=()=>{const img=new Image();img.onload=()=>{sourceImage=img;preview.innerHTML='';const p=document.createElement('img');p.src=reader.result;p.alt='Uploaded image preview';preview.appendChild(p);statusEl.textContent='Image loaded. Add a website URL and generate.';download.disabled=true;};img.onerror=()=>statusEl.textContent='Could not read that image.';img.src=reader.result;};reader.readAsDataURL(f);
+});
+function validUrl(v){try{const u=new URL(v);return ['http:','https:'].includes(u.protocol)}catch{return false}}
+generate.addEventListener('click',()=>{
+ if(!sourceImage){statusEl.textContent='Please upload an image first.';return}
+ const target=urlInput.value.trim();if(!validUrl(target)){statusEl.textContent='Enter a valid website address beginning with https://';return}
+ if(typeof QRCode==='undefined'){statusEl.textContent='QR library could not load. Check your internet connection and reload.';return}
+ const size=Math.max(100,Math.min(500,Number(document.getElementById('size').value)||180));
+ const margin=Math.max(0,Math.min(100,Number(document.getElementById('margin').value)||0));
+ const temp=document.createElement('div');new QRCode(temp,{text:target,width:size,height:size,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.H});
+ const qr=temp.querySelector('canvas')||temp.querySelector('img');
+ if(!qr){statusEl.textContent='Could not generate QR code. Please try again.';return}
+ const finish=(qrCanvas)=>{
+  const canvas=document.createElement('canvas');canvas.width=sourceImage.naturalWidth;canvas.height=sourceImage.naturalHeight;
+  const ctx=canvas.getContext('2d');ctx.drawImage(sourceImage,0,0);
+  const actual=Math.max(80,Math.min(size,canvas.width-16,canvas.height-16)), x=canvas.width-margin-actual, y=canvas.height-margin-actual;
+  const pad=Math.max(8,actual*.055);ctx.fillStyle='#fff';ctx.fillRect(x-pad,y-pad,actual+pad*2,actual+pad*2);ctx.drawImage(qrCanvas,x,y,actual,actual);
+  outputUrl=canvas.toDataURL('image/png');const out=new Image();out.src=outputUrl;out.alt='Generated scannable image';preview.innerHTML='';preview.appendChild(out);
+  document.getElementById('qrsmall').innerHTML='';const mini=document.createElement('img');mini.src=qrCanvas.toDataURL('image/png');mini.alt='Generated QR code';document.getElementById('qrsmall').appendChild(mini);
+  document.getElementById('qrbox').hidden=false;download.disabled=false;statusEl.textContent='Success! Your scannable image is ready to download.';
+ };
+ if(qr.tagName==='CANVAS')finish(qr);else{const im=new Image();im.onload=()=>{const c=document.createElement('canvas');c.width=size;c.height=size;c.getContext('2d').drawImage(im,0,0,size,size);finish(c)};im.src=qr.src;}
+});
+download.addEventListener('click',()=>{if(!outputUrl)return;const a=document.createElement('a');a.href=outputUrl;a.download='scanlink-scannable-image.png';document.body.appendChild(a);a.click();a.remove();});
+document.getElementById('reset').addEventListener('click',()=>{photo.value='';urlInput.value='';sourceImage=null;outputUrl=null;preview.innerHTML='<div class="empty"><strong>Your image preview appears here</strong>Upload an image to get started.</div>';document.getElementById('qrbox').hidden=true;download.disabled=true;statusEl.textContent='Upload an image and enter a website URL to begin.';});
+</script>
+</body></html>
