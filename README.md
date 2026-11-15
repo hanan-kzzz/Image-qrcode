@@ -1,18 +1,23 @@
-# ScanLink V1 — Image to Scannable QR
+# ScanLink V1 — Invisible image recognition
 
-A responsive browser app that embeds a QR code into an uploaded image. Scanning the QR code with a phone camera opens the assigned website.
+ScanLink recognises registered photographs using ORB visual features (OpenCV). The original photo remains unchanged: no QR code, watermark, or hidden pixel payload is added. A visitor opens ScanLink, uses its camera scanner, and the server matches the image to its registered destination URL.
 
-## Run
-1. Open `index.html` in a modern browser, or deploy this repository as a static site.
-2. Internet access is needed to load QRCode.js from cdnjs.
+## Architecture
+- FastAPI + OpenCV ORB matching on Render
+- Supabase Postgres stores feature descriptors and destination URLs
+- Admin registration protected by a server-side token
+- Browser receiver submits camera frames to the recognition API
 
-## Use
-1. Upload a JPG, PNG or WebP image.
-2. Enter a complete URL beginning with `https://`.
-3. Generate the scannable image.
-4. Download the PNG and test it with a phone camera.
+## Setup
+1. Run `schema.sql` in the Supabase SQL Editor once the project database is available.
+2. Set Render environment variables: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `ADMIN_TOKEN`.
+3. Deploy from `main` using `render.yaml`.
+4. Open the site, register an image and its destination in Admin, then scan it from another device.
 
-## V1 limitations
-- Uses a visible QR code, not invisible image recognition.
-- QR code is placed in the lower-right corner with a white quiet-zone border.
-- No accounts, link management, or scan analytics in V1.
+Never put the Supabase service-role key in browser code or GitHub.
+
+## Limitations
+- The phone's default camera app cannot identify these images. Users must open the ScanLink website and grant camera access.
+- This V1 is a visual-matching prototype, not cryptographic proof of image authenticity.
+- Similar-looking images, crops, low light, motion blur, and strong perspective changes can reduce recognition accuracy.
+- Do not use this prototype for payments, identity checks, access control, or safety-critical decisions.
